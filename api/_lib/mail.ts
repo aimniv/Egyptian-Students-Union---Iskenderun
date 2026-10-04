@@ -1,21 +1,47 @@
+import nodemailer from 'nodemailer';
+
 /** Messages sent while no mail provider is configured (local development only). */
 export const devOutbox: { to: string; subject: string; text: string }[] = [];
 
-export async function sendMail(to: string, subject: string, text: string): Promise<void> {
-  const key = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM;
-  if (!key || !from) {
-    if (process.env.VERCEL) throw new Error('MAIL_NOT_CONFIGURED');
-    devOutbox.push({ to, subject, text });
-    console.log(`[dev mail] to=${to} subject="${subject}"\n${text}`);
-    return;
+async function sendViaGmail(user: string, pass: string, to: string, subject: string, text: string) {
+  const transport = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user, pass: pass.replace(/\s+/g, '') },
+  });
+  try {
+    await transport.sendMail({ from: `MÖB Admin <${user}>`, to, subject, text });
+  } catch {
+    throw new Error('MAIL_FAILED:smtp');
   }
+}
+
+async function sendViaResend(key: string, from: string, to: string, subject: string, text: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from, to, subject, text }),
   });
   if (!res.ok) throw new Error(`MAIL_FAILED:${res.status}`);
+}
+
+/**
+ * Gmail SMTP (GMAIL_USER + GMAIL_APP_PASSWORD) is used when configured, otherwise Resend
+ * (RESEND_API_KEY + MAIL_FROM). Gmail needs no domain and can reach any recipient.
+ */
+export async function sendMail(to: string, subject: string, text: string): Promise<void> {
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+  if (gmailUser && gmailPass) return sendViaGmail(gmailUser, gmailPass, to, subject, text);
+
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM;
+  if (key && from) return sendViaResend(key, from, to, subject, text);
+
+  if (process.env.VERCEL) throw new Error('MAIL_NOT_CONFIGURED');
+  devOutbox.push({ to, subject, text });
+  console.log(`[dev mail] to=${to} subject="${subject}"\n${text}`);
 }
 
 export function codeMail(code: string, purpose: 'login' | 'setup') {
