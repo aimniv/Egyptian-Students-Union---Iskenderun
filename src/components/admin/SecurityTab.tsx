@@ -1,27 +1,21 @@
 import React, { useState } from 'react';
-import { SecurityConfig, LoginAttempt, ActivityLog, Language } from '../../types';
+import { LoginAttempt, ActivityLog, Language } from '../../types';
 import { db } from '../../data/mockDb';
+import { AdminAccounts } from './AdminAccounts';
 import { ShieldCheck, HardDrive, RefreshCw, FileDown, Upload, AlertOctagon, Lock } from 'lucide-react';
 
 interface Props {
   currentLang: Language;
   addToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
   addActivityLog: (action: string, details: string) => void;
+  adminEmail?: string;
 }
 
-export const SecurityTab: React.FC<Props> = ({ currentLang, addToast, addActivityLog }) => {
-  const [securityConfig, setSecurityConfig] = useState<SecurityConfig>(db.getSecurityConfig());
+export const SecurityTab: React.FC<Props> = ({ currentLang, addToast, addActivityLog, adminEmail }) => {
   const [loginHistory] = useState<LoginAttempt[]>(db.getLoginHistory());
   const [activityLogs] = useState<ActivityLog[]>(db.getActivityLogs());
   const [restoreJson, setRestoreJson] = useState('');
   const [showRestoreModal, setShowRestoreModal] = useState(false);
-
-  const handleToggleSecurity = (key: keyof SecurityConfig) => {
-    const updated = { ...securityConfig, [key]: !securityConfig[key] };
-    setSecurityConfig(updated);
-    db.saveSecurityConfig(updated);
-    addToast('Security setting updated', 'info');
-  };
 
   const handleDownloadBackup = () => {
     const backupObj = db.getFullBackupObject();
@@ -75,6 +69,8 @@ export const SecurityTab: React.FC<Props> = ({ currentLang, addToast, addActivit
         </div>
       </div>
 
+      <AdminAccounts currentLang={currentLang} adminEmail={adminEmail} addToast={addToast} addActivityLog={addActivityLog} />
+
       {/* Backup and Restore Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-xl border shadow-xs space-y-3">
@@ -111,13 +107,8 @@ export const SecurityTab: React.FC<Props> = ({ currentLang, addToast, addActivit
           </h3>
           <div className="space-y-2">
             <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border">
-              <span>المصادقة الثنائية (Two-Factor OTP)</span>
-              <button
-                onClick={() => handleToggleSecurity('twoFactorActive')}
-                className={`px-2.5 py-1 rounded font-bold cursor-pointer ${securityConfig.twoFactorActive ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}
-              >
-                {securityConfig.twoFactorActive ? 'ENABLED' : 'DISABLED'}
-              </button>
+              <span>المصادقة الثنائية عبر البريد (Email 2FA)</span>
+              <span className="font-mono text-green-700 font-bold">ALWAYS ON</span>
             </div>
             <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border">
               <span>حماية هجمات CSRF & Injection Shield</span>

@@ -6,6 +6,7 @@ import { Footer } from './components/Footer';
 import { ClientPortal } from './components/ClientPortal';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminLogin } from './components/AdminLogin';
+import { adminApi, AdminSession } from './lib/adminApi';
 import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
 
 interface Toast {
@@ -35,11 +36,10 @@ export default function App() {
   // Dedicated route state for /admin
   const [isAdminRoute, setIsAdminRoute] = useState<boolean>(() => checkIsAdminPath());
   
-  // Admin authentication state (persists in sessionStorage for tab lifetime)
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return sessionStorage.getItem('mob_admin_auth') === 'true';
-  });
+  // Admin session lives in an HttpOnly cookie issued by the server; the UI only mirrors it.
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
+  const [isCheckingSession, setIsCheckingSession] = useState<boolean>(() => checkIsAdminPath());
+  const isAdminAuthenticated = adminSession !== null;
   
   // CMS, CRM, ERP States synced with Local Storage DB
   const [translations, setTranslations] = useState<Record<string, { ar: string; tr: string; en: string }>>({});
@@ -69,6 +69,24 @@ export default function App() {
       window.removeEventListener('hashchange', handleUrlChange);
     };
   }, []);
+
+  // Ask the server whether a valid admin session exists whenever /admin is opened
+  useEffect(() => {
+    if (!isAdminRoute || isAdminAuthenticated) {
+      setIsCheckingSession(false);
+      return;
+    }
+    let cancelled = false;
+    setIsCheckingSession(true);
+    adminApi
+      .me()
+      .then((session) => !cancelled && setAdminSession(session))
+      .catch(() => undefined)
+      .finally(() => !cancelled && setIsCheckingSession(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminRoute]);
 
   // Sync HTML document direction dynamically
   useEffect(() => {
@@ -125,9 +143,8 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAdminLoginSuccess = () => {
-    setIsAdminAuthenticated(true);
-    sessionStorage.setItem('mob_admin_auth', 'true');
+  const handleAdminLoginSuccess = (session: AdminSession) => {
+    setAdminSession(session);
     addToast(
       currentLang === 'ar'
         ? 'تم تسجيل الدخول بنجاح! مرحباً بكم في لوحة التحكم الإدارية.'
@@ -139,8 +156,8 @@ export default function App() {
   };
 
   const handleAdminLogout = () => {
-    setIsAdminAuthenticated(false);
-    sessionStorage.removeItem('mob_admin_auth');
+    adminApi.logout().catch(() => undefined);
+    setAdminSession(null);
     addToast(
       currentLang === 'ar'
         ? 'تم تسجيل الخروج بنجاح من لوحة الإدارة.'
@@ -173,7 +190,11 @@ export default function App() {
         Otherwise, render the Public Student Union Portal
       */}
       {isAdminRoute ? (
-        !isAdminAuthenticated ? (
+        isCheckingSession ? (
+          <div className="min-h-screen flex items-center justify-center bg-[#163A4A]">
+            <div className="h-10 w-10 border-4 border-[#C8B273] border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : !isAdminAuthenticated ? (
           /* Dedicated Admin Login Screen on /admin */
           <AdminLogin
             currentLang={currentLang}
@@ -192,6 +213,7 @@ export default function App() {
             addToast={addToast}
             onNavigateToSite={() => navigateToSite('home')}
             onLogout={handleAdminLogout}
+            adminEmail={adminSession?.email}
           />
         )
       ) : (
