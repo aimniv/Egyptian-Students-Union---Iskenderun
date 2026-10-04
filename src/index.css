@@ -1,0 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Cairo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Base style resets and beautiful scrollbars */
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+}
+
+body {
+  background-color: #F8FAFC;
+  color: #1F2937;
+  overflow-x: hidden;
+}
+
+/* Custom styled scrollbars for a premium editorial finish */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C8B273;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #163A4A;
+}
+
+/* Beautiful custom animations for modal transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Layout switches dynamically based on dir attribute */
+[dir="rtl"] {
+  font-family: "Cairo", "Inter", sans-serif;
+}
+
+/* Enable Cairo font for Arabic language */
+html[lang="ar"] {
+  font-family: "Cairo", "Inter", sans-serif;
+}
+
+/* Force text alignment and text-direction for Arabic language on typography and content elements */
+html[lang="ar"] p,
+html[lang="ar"] h1,
+html[lang="ar"] h2,
+html[lang="ar"] h3,
+html[lang="ar"] h4,
+html[lang="ar"] h5,
+html[lang="ar"] h6,
+html[lang="ar"] li,
+html[lang="ar"] blockquote,
+html[lang="ar"] label,
+html[lang="ar"] textarea,
+html[lang="ar"] .ar-rtl {
+  direction: rtl;
+  text-align: right;
+}
+
+/* Respect explicit alignment utility classes when Arabic language is active */
+html[lang="ar"] .text-center,
+html[lang="ar"] .text-center * {
+  text-align: center !important;
+}
+
+html[lang="ar"] .text-left,
+html[lang="ar"] .text-left * {
+  text-align: left !important;
+}
+
+html[lang="ar"] .text-right,
+html[lang="ar"] .text-right * {
+  text-align: right !important;
+}
+
+/* Ensure list bullets style nicely when RTL is active */
+html[lang="ar"] ul {
+  padding-right: 1.25rem;
+  padding-left: 0;
+  text-align: right;
+}
+
+html[lang="ar"] ol {
+  padding-right: 1.25rem;
+  padding-left: 0;
+  text-align: right;
+}
+
+/* Beautiful custom class for card headings or sections that need specific styling */
+.modern-card {
+  background: white;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.08), 0 2px 8px -1px rgba(148, 163, 184, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -4px rgba(148, 163, 184, 0.12), 0 4px 12px -2px rgba(148, 163, 184, 0.06);
+  border-color: rgba(200, 178, 115, 0.4);
+}
+
+/* Equalizer keyframe for floating player visualizer */
+@keyframes music-wave {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 14px;
+  }
+}
+
+

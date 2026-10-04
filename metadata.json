@@ -1,0 +1,6 @@
+{
+  "name": "Egyptian Students' Union - Iskenderun",
+  "description": "Official multilingual digital identity, student portal, and administration system of the Egyptian Students' Union in Iskenderun (MÖB), Türkiye.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
