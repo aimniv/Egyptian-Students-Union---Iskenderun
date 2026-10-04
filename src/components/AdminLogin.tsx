@@ -1,25 +1,94 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
 import { LogoCrest } from './Header';
-import { 
-  ShieldCheck, 
-  Lock, 
-  User, 
-  KeyRound, 
-  ArrowLeft, 
-  ArrowRight, 
-  AlertCircle, 
-  ShieldAlert, 
-  CheckCircle2, 
-  Globe 
+import { adminApi, AdminSession, ApiError } from '../lib/adminApi';
+import {
+  ShieldCheck,
+  Lock,
+  Mail,
+  KeyRound,
+  ArrowLeft,
+  ArrowRight,
+  AlertCircle,
+  ShieldAlert,
+  CheckCircle2,
+  Globe
 } from 'lucide-react';
 
 interface AdminLoginProps {
   currentLang: Language;
   onLanguageChange: (lang: Language) => void;
-  onLoginSuccess: () => void;
+  onLoginSuccess: (session: AdminSession) => void;
   onBackToSite: () => void;
 }
+
+type Step = 'login' | 'otp' | 'setupRequest' | 'setupConfirm';
+
+const TEXT = {
+  ar: {
+    email: 'البريد الإلكتروني', password: 'كلمة المرور', newPassword: 'كلمة المرور الجديدة (10 أحرف على الأقل)',
+    code: 'رمز التحقق المرسل إلى بريدك', continue: 'متابعة الدخول', verify: 'تأكيد ودخول لوحة التحكم',
+    sendCode: 'إرسال الرمز إلى بريدي', savePassword: 'حفظ كلمة المرور',
+    firstTime: 'أول مرة / نسيت كلمة المرور', back: 'العودة لتسجيل الدخول',
+    otpInfo: 'أرسلنا رمزاً من 6 أرقام إلى بريدك الإلكتروني. صلاحيته 10 دقائق.',
+    setupInfo: 'أدخل بريدك المسجل كمشرف وسنرسل لك رمزاً لتعيين كلمة المرور.',
+    setupSent: 'إن كان البريد مسجلاً كمشرف فقد أُرسل إليه رمز. أدخله مع كلمة المرور الجديدة.',
+    setupDone: 'تم حفظ كلمة المرور. يمكنك تسجيل الدخول الآن.',
+    errors: {
+      invalid_credentials: 'البريد أو كلمة المرور غير صحيحة',
+      invalid_code: 'الرمز غير صحيح أو منتهي الصلاحية',
+      invalid_email: 'يرجى إدخال بريد إلكتروني صحيح',
+      weak_password: 'كلمة المرور قصيرة (10 أحرف على الأقل)',
+      too_many_attempts: 'محاولات كثيرة. حاول لاحقاً',
+      not_configured: 'الخادم غير مهيأ بعد (قاعدة البيانات أو خدمة البريد)',
+      mail_failed: 'تعذر إرسال البريد. حاول لاحقاً',
+      unreachable: 'خدمة الدخول غير متاحة (الواجهة البرمجية /api لا تعمل)',
+      default: 'حدث خطأ غير متوقع',
+    },
+  },
+  tr: {
+    email: 'E-posta', password: 'Şifre', newPassword: 'Yeni şifre (en az 10 karakter)',
+    code: 'E-postanıza gelen doğrulama kodu', continue: 'Devam Et', verify: 'Doğrula ve Panele Gir',
+    sendCode: 'Kodu e-postama gönder', savePassword: 'Şifreyi Kaydet',
+    firstTime: 'İlk giriş / şifremi unuttum', back: 'Girişe dön',
+    otpInfo: 'E-postanıza 6 haneli bir kod gönderdik. 10 dakika geçerlidir.',
+    setupInfo: 'Yönetici olarak kayıtlı e-postanızı girin; şifre belirlemeniz için kod göndereceğiz.',
+    setupSent: 'E-posta yönetici olarak kayıtlıysa bir kod gönderildi. Kodu yeni şifrenizle birlikte girin.',
+    setupDone: 'Şifre kaydedildi. Şimdi giriş yapabilirsiniz.',
+    errors: {
+      invalid_credentials: 'E-posta veya şifre hatalı',
+      invalid_code: 'Kod hatalı veya süresi dolmuş',
+      invalid_email: 'Geçerli bir e-posta girin',
+      weak_password: 'Şifre çok kısa (en az 10 karakter)',
+      too_many_attempts: 'Çok fazla deneme. Daha sonra tekrar deneyin',
+      not_configured: 'Sunucu henüz yapılandırılmadı (veritabanı veya e-posta servisi)',
+      mail_failed: 'E-posta gönderilemedi. Daha sonra tekrar deneyin',
+      unreachable: 'Giriş servisi ulaşılamıyor (/api çalışmıyor)',
+      default: 'Beklenmeyen bir hata oluştu',
+    },
+  },
+  en: {
+    email: 'Email', password: 'Password', newPassword: 'New password (at least 10 characters)',
+    code: 'Verification code from your email', continue: 'Continue', verify: 'Verify & Enter Console',
+    sendCode: 'Email me a code', savePassword: 'Save Password',
+    firstTime: 'First time / forgot password', back: 'Back to sign in',
+    otpInfo: 'We emailed a 6-digit code to your address. It is valid for 10 minutes.',
+    setupInfo: 'Enter the email registered as an administrator and we will send a code to set your password.',
+    setupSent: 'If the email is registered as an administrator, a code was sent. Enter it with your new password.',
+    setupDone: 'Password saved. You can sign in now.',
+    errors: {
+      invalid_credentials: 'Incorrect email or password',
+      invalid_code: 'The code is wrong or has expired',
+      invalid_email: 'Please enter a valid email',
+      weak_password: 'Password is too short (at least 10 characters)',
+      too_many_attempts: 'Too many attempts. Try again later',
+      not_configured: 'Server is not configured yet (database or mail service)',
+      mail_failed: 'Could not send the email. Try again later',
+      unreachable: 'Sign-in service unreachable (/api is not running)',
+      default: 'Unexpected error',
+    },
+  },
+} as const;
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({
   currentLang,
@@ -27,62 +96,57 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   onLoginSuccess,
   onBackToSite,
 }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
-  const [otpStep, setOtpStep] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
+  const t = TEXT[currentLang];
+  const [step, setStep] = useState<Step>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const goTo = (next: Step, info = '') => {
+    setStep(next);
+    setErrorMsg('');
+    setNotice(info);
+    setCode('');
+    setPassword('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-
-    if (!username.trim() || !password.trim()) {
-      setErrorMsg(
-        currentLang === 'ar'
-          ? 'يرجى إدخال اسم المستخدم وكلمة المرور'
-          : currentLang === 'tr'
-          ? 'Lütfen kullanıcı adı ve şifrenizi girin'
-          : 'Please enter username and password'
-      );
-      return;
-    }
-
     setIsLoading(true);
-
-    setTimeout(() => {
-      setIsLoading(false);
-      if (!otpStep) {
-        // Step 1: Verify username and password
-        if (username.toLowerCase() === 'admin' && password === 'admin') {
-          setOtpStep(true);
-          setOtpCode('123456'); // auto-fill demo OTP code for smooth testing
-        } else {
-          setErrorMsg(
-            currentLang === 'ar'
-              ? 'بيانات الدخول غير صحيحة! (استخدم: admin / admin)'
-              : currentLang === 'tr'
-              ? 'Hatalı kullanıcı adı veya şifre! (Demo için: admin / admin)'
-              : 'Invalid credentials! (Use demo: admin / admin)'
-          );
-        }
+    try {
+      if (step === 'login') {
+        await adminApi.login(email, password);
+        goTo('otp', t.otpInfo);
+      } else if (step === 'otp') {
+        onLoginSuccess(await adminApi.verify(email, code));
+      } else if (step === 'setupRequest') {
+        await adminApi.setupRequest(email);
+        goTo('setupConfirm', t.setupSent);
       } else {
-        // Step 2: Verify 2FA OTP
-        if (otpCode.trim() === '123456') {
-          onLoginSuccess();
-        } else {
-          setErrorMsg(
-            currentLang === 'ar'
-              ? 'رمز التحقق الثنائي (2FA) غير صحيح! (الكود الافتراضي: 123456)'
-              : currentLang === 'tr'
-              ? '2FA Doğrulama kodu geçersiz! (Geçerli kod: 123456)'
-              : 'Invalid 2FA code! (Valid code: 123456)'
-          );
-        }
+        await adminApi.setupConfirm(email, code, password);
+        goTo('login', t.setupDone);
       }
-    }, 400);
+    } catch (err) {
+      const key = err instanceof ApiError ? err.code : 'default';
+      setErrorMsg((t.errors as Record<string, string>)[key] || t.errors.default);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const submitLabel = {
+    login: t.continue,
+    otp: t.verify,
+    setupRequest: t.sendCode,
+    setupConfirm: t.savePassword,
+  }[step];
+
+  const inputClass =
+    'w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8B273] focus:border-transparent font-medium';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0c222c] via-[#163A4A] to-[#1c475d] text-white flex flex-col justify-between p-4 sm:p-6 font-sans">
@@ -176,121 +240,108 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
               </div>
             )}
 
-            {!otpStep ? (
-              <>
-                {/* Username */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                    <span>{currentLang === 'ar' ? 'اسم المستخدم' : currentLang === 'tr' ? 'Kullanıcı Adı' : 'Username'}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">admin</span>
-                  </label>
-                  <div className="relative">
-                    <User className="h-4 w-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
-                    <input
-                      type="text"
-                      required
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="admin"
-                      className="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8B273] focus:border-transparent font-medium"
-                    />
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                    <span>{currentLang === 'ar' ? 'كلمة المرور السرية' : currentLang === 'tr' ? 'Yönetici Şifresi' : 'Password'}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">admin</span>
-                  </label>
-                  <div className="relative">
-                    <KeyRound className="h-4 w-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8B273] focus:border-transparent font-medium"
-                    />
-                  </div>
-                </div>
-              </>
-            ) : (
-              /* Step 2: 2FA OTP */
-              <div className="space-y-4 animate-fade-in">
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
-                  <ShieldAlert className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold">
-                      {currentLang === 'ar' ? 'التحقق بخطوتين (2FA)' : currentLang === 'tr' ? '2 Adımlı Güvenlik Doğrulaması' : 'Two-Factor Authentication'}
-                    </p>
-                    <p className="text-[11px] mt-0.5 text-amber-800">
-                      {currentLang === 'ar' 
-                        ? 'كود التحقق الخاص بك هو: 123456' 
-                        : currentLang === 'tr' 
-                        ? 'Demo için güvenlik kodunuz: 123456' 
-                        : 'Your verification OTP is: 123456'}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {currentLang === 'ar' ? 'أدخل رمز التحقق (OTP)' : currentLang === 'tr' ? '6 Haneli Doğrulama Kodu' : '6-Digit OTP Code'}
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    required
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    placeholder="123456"
-                    className="w-full py-3 border-2 border-[#C8B273] rounded-xl text-center text-xl font-mono tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-[#163A4A]"
-                    autoFocus
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setOtpStep(false)}
-                  className="text-xs text-slate-500 hover:text-slate-800 underline block text-center cursor-pointer"
-                >
-                  {currentLang === 'ar' ? '← العودة لتعديل اسم المستخدم' : currentLang === 'tr' ? '← Kullanıcı adı ve şifreye geri dön' : '← Back to credentials'}
-                </button>
+            {notice && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-start gap-2">
+                <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{notice}</span>
               </div>
             )}
 
-            {/* Submit Button */}
+            {(step === 'login' || step === 'setupRequest' || step === 'setupConfirm') && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">{t.email}</label>
+                <div className="relative">
+                  <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    autoComplete="username"
+                    value={email}
+                    readOnly={step === 'setupConfirm'}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            )}
+
+            {step === 'setupRequest' && (
+              <p className="text-[11px] text-slate-500">{t.setupInfo}</p>
+            )}
+
+            {(step === 'otp' || step === 'setupConfirm') && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">{t.code}</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="••••••"
+                  className="w-full py-3 border-2 border-[#C8B273] rounded-xl text-center text-xl font-mono tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-[#163A4A]"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {(step === 'login' || step === 'setupConfirm') && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {step === 'login' ? t.password : t.newPassword}
+                </label>
+                <div className="relative">
+                  <KeyRound className="h-4 w-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
+                  <input
+                    type="password"
+                    required
+                    minLength={step === 'setupConfirm' ? 10 : undefined}
+                    autoComplete={step === 'login' ? 'current-password' : 'new-password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-[#163A4A] hover:bg-[#24495D] text-[#C8B273] font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+              className="w-full py-3 bg-[#163A4A] hover:bg-[#24495D] disabled:opacity-70 text-[#C8B273] font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
             >
               {isLoading ? (
                 <div className="h-5 w-5 border-2 border-[#C8B273] border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <>
                   <Lock className="h-4 w-4" />
-                  <span>
-                    {!otpStep
-                      ? currentLang === 'ar' ? 'متابعة الدخول' : currentLang === 'tr' ? 'Devam Et (Giriş)' : 'Continue to Verify'
-                      : currentLang === 'ar' ? 'تأكيد ودخول لوحة التحكم' : currentLang === 'tr' ? 'Doğrula ve Panele Gir' : 'Verify & Enter Console'}
-                  </span>
+                  <span>{submitLabel}</span>
                 </>
               )}
             </button>
 
-            {/* Quick Demo Credentials Box */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
-              <span className="font-bold text-slate-800 block">
-                {currentLang === 'ar' ? 'معلومات الدخول التجريبية (Demo):' : currentLang === 'tr' ? 'Hızlı Test Giriş Bilgileri:' : 'Demo Test Credentials:'}
-              </span>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] text-slate-700">
-                <span>User: <strong>admin</strong></span>
-                <span>Pass: <strong>admin</strong></span>
-                <span>2FA: <strong>123456</strong></span>
-              </div>
+            <div className="text-center">
+              {step === 'login' ? (
+                <button
+                  type="button"
+                  onClick={() => goTo('setupRequest')}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                >
+                  {t.firstTime}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => goTo('login')}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                >
+                  {t.back}
+                </button>
+              )}
             </div>
           </form>
 
@@ -303,7 +354,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
             <span>•</span>
             <span className="flex items-center gap-1">
               <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
-              <span>2FA Verified</span>
+              <span>Email 2FA</span>
             </span>
             <span>•</span>
             <span>Route: /admin</span>

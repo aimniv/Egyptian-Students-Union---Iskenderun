@@ -38,6 +38,7 @@ interface AdminPanelProps {
   addToast: (message: string, type: 'success' | 'info' | 'warning') => void;
   onNavigateToSite?: () => void;
   onLogout?: () => void;
+  adminEmail?: string;
 }
 
 type AdminTab = 
@@ -67,6 +68,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   addToast,
   onNavigateToSite,
   onLogout,
+  adminEmail,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   
@@ -90,7 +92,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const addActivityLog = (action: string, details: string) => {
     const newLog: ActivityLog = {
       id: 'ACTL-' + Date.now(),
-      adminUser: 'أحمد محمود الرفاعي (Super Admin)',
+      adminUser: adminEmail || 'admin',
       action,
       details,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -205,7 +207,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div className="col-span-1 bg-[#163A4A] rounded-2xl shadow-md p-4 text-white space-y-1 h-fit">
           <div className="pb-4 mb-3 border-b border-slate-700 text-center">
             <span className="block text-xs font-bold text-[#C8B273] tracking-widest uppercase font-mono">Control Desk</span>
-            <span className="text-[11px] text-slate-300">أحمد محمود الرفاعي (Super Admin)</span>
+            <span className="text-[11px] text-slate-300">{adminEmail}</span>
           </div>
 
           <div className="space-y-1">
@@ -415,7 +417,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           )}
 
           {activeTab === 'security' && (
-            <SecurityTab currentLang={currentLang} addToast={addToast} addActivityLog={addActivityLog} />
+            <SecurityTab currentLang={currentLang} addToast={addToast} addActivityLog={addActivityLog} adminEmail={adminEmail} />
           )}
         </div>
       </div>

@@ -1,0 +1,45 @@
+/** Messages sent while no mail provider is configured (local development only). */
+export const devOutbox: { to: string; subject: string; text: string }[] = [];
+
+export async function sendMail(to: string, subject: string, text: string): Promise<void> {
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM;
+  if (!key || !from) {
+    if (process.env.VERCEL) throw new Error('MAIL_NOT_CONFIGURED');
+    devOutbox.push({ to, subject, text });
+    console.log(`[dev mail] to=${to} subject="${subject}"\n${text}`);
+    return;
+  }
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to, subject, text }),
+  });
+  if (!res.ok) throw new Error(`MAIL_FAILED:${res.status}`);
+}
+
+export function codeMail(code: string, purpose: 'login' | 'setup') {
+  const minutes = 10;
+  const subject =
+    purpose === 'login'
+      ? 'MÖB Admin - Verification code / Doğrulama kodu / رمز التحقق'
+      : 'MÖB Admin - Password setup code / Şifre belirleme kodu / رمز تعيين كلمة المرور';
+  const text = [
+    `Your code: ${code} (valid for ${minutes} minutes)`,
+    `Kodunuz: ${code} (${minutes} dakika geçerli)`,
+    `رمزك: ${code} (صالح لمدة ${minutes} دقائق)`,
+    '',
+    'If you did not request this, ignore this email. / Bu işlemi siz yapmadıysanız bu e-postayı yok sayın. / إذا لم تطلب ذلك فتجاهل هذه الرسالة.',
+  ].join('\n');
+  return { subject, text };
+}
+
+export function inviteMail(url: string, invitedBy: string) {
+  const subject = 'MÖB Admin - You have been added as administrator / Yönetici olarak eklendiniz / تمت إضافتك مشرفاً';
+  const text = [
+    `${invitedBy} added you as an administrator. Open ${url}, choose "First time / forgot password" and set your password.`,
+    `${invitedBy} sizi yönetici olarak ekledi. ${url} adresini açın, "İlk giriş / şifremi unuttum" seçeneğiyle şifrenizi belirleyin.`,
+    `قام ${invitedBy} بإضافتك مشرفاً. افتح ${url} واختر "أول مرة / نسيت كلمة المرور" لتعيين كلمة المرور.`,
+  ].join('\n\n');
+  return { subject, text };
+}
