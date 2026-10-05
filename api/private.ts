@@ -1,4 +1,5 @@
 import { getStore } from './_lib/store.js';
+import { photoKey } from './photo.js';
 import { json, readJson } from './_lib/auth.js';
 import {
   byteSize, isPrivateKey, MAX_BYTES, MAX_ITEMS, privateKey, PRIVATE_KEYS, readList, requireAdmin, writeList,
@@ -45,6 +46,8 @@ async function handle(req: Request): Promise<Response> {
     }
     if (list.length > MAX_ITEMS || byteSize(list) > MAX_BYTES) return json(413, { error: 'too_large' });
     await writeList(key, list);
+    // deleting an application also deletes its ID photo
+    if (key === 'memberships' && removed.size) await getStore().del(...[...removed].map(photoKey));
     return json(200, { ok: true, count: list.length });
   }
 

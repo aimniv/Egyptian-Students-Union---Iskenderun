@@ -293,6 +293,12 @@ export const MembershipsTab: React.FC<Props> = ({ currentLang, addToast, addActi
               <button onClick={() => setSelectedMemb(null)} className="text-xl">×</button>
             </div>
 
+            {selectedMemb.photoUrl && (
+              <div className="flex justify-center mb-3">
+                <img src={selectedMemb.photoUrl} alt="" className="h-36 w-[7.2rem] object-cover rounded-lg border-2 border-[#C8B273]/60 shadow-sm" />
+              </div>
+            )}
+
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border">
                 <div><strong className="text-slate-400">الاسم بالعربي:</strong> <p className="font-bold text-slate-900">{selectedMemb.nameAr}</p></div>
