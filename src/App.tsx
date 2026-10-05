@@ -104,7 +104,7 @@ export default function App() {
           en: 'The change could not be saved to the server. Check your connection and try again.',
         },
       };
-      addToast((text[code ?? ''] ?? text.default)[lang], 'warning');
+      addToast((text[code ?? ''] ?? text.default)[lang], 'warning', 20000);
     };
     window.addEventListener(SYNC_ERROR_EVENT, onSyncError);
     return () => window.removeEventListener(SYNC_ERROR_EVENT, onSyncError);
@@ -155,13 +155,13 @@ export default function App() {
     document.documentElement.lang = currentLang;
   }, [currentLang]);
 
-  const addToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
+  const addToast = (message: string, type: 'success' | 'info' | 'warning' = 'success', durationMs = 5000) => {
     const id = 'toast_' + Date.now();
     setToasts((prev) => [...prev, { id, message, type }]);
     
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 5000);
+    }, durationMs);
   };
 
   const removeToast = (id: string) => {

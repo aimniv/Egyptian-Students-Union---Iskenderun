@@ -784,6 +784,56 @@ async function api(method: string, url: string, body?: unknown): Promise<any> {
   return data;
 }
 
+const imageUrlCache = new Map<string, string>();
+
+/** Re-encodes an oversized picture so it fits the upload limit. */
+function shrinkImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1000 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(dataUrl);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Replaces every embedded picture (data:image/...) inside the content with the address of a copy
+ * stored on the server, so the content itself stays small.
+ */
+async function externalizeImages<T>(value: T): Promise<T> {
+  if (typeof value === 'string') {
+    if (!value.startsWith('data:image/') || value.length < 2000) return value;
+    const known = imageUrlCache.get(value);
+    if (known) return known as T;
+    const data = value.length > 700_000 ? await shrinkImage(value) : value;
+    const { url } = await api('PUT', '/api/img', { dataUrl: data });
+    imageUrlCache.set(value, url);
+    return url as T;
+  }
+  if (Array.isArray(value)) {
+    const out: unknown[] = [];
+    for (const item of value) out.push(await externalizeImages(item));
+    return out as T;
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = await externalizeImages(v);
+    return out as T;
+  }
+  return value;
+}
+
 class LocalDatabase {
   private admin = false;
   private snapshots: Record<string, Map<string, string>> = {};
@@ -858,7 +908,13 @@ class LocalDatabase {
 
   private async pushPublic(name: string, value: unknown) {
     try {
-      await api('PUT', `/api/content?key=${name}`, { value });
+      const slim = await externalizeImages(value);
+      // Keep the local copy small too, unless the administrator changed it again in the meantime.
+      const localKey = keyOf('public', name);
+      if (localStorage.getItem(localKey) === JSON.stringify(value) && JSON.stringify(slim) !== JSON.stringify(value)) {
+        localStorage.setItem(localKey, JSON.stringify(slim));
+      }
+      await api('PUT', `/api/content?key=${name}`, { value: slim });
     } catch (e) {
       emitSyncError(e instanceof Error ? e.message : 'unknown');
     }
