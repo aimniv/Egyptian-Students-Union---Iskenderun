@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Membership, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, Search, FileDown, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -49,7 +50,7 @@ export const MembershipsTab: React.FC<Props> = ({ currentLang, addToast, addActi
 
   const handleReject = (id: string) => {
     if (!rejectionReason) {
-      alert(currentLang === 'ar' ? 'يرجى كتابة سبب الرفض' : 'Please provide rejection reason');
+      alertDialog(currentLang === 'ar' ? 'يرجى كتابة سبب الرفض' : 'Please provide rejection reason');
       return;
     }
     const updated = memberships.map(m => {
@@ -70,8 +71,8 @@ export const MembershipsTab: React.FC<Props> = ({ currentLang, addToast, addActi
     setRejectionReason('');
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف ملف الطالب ${name}؟` : `Delete record for ${name}?`)) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف ملف الطالب ${name}؟` : `Delete record for ${name}?`))) return;
     const updated = memberships.filter(m => m.id !== id);
     db.saveMemberships(updated);
     setMemberships(updated);
@@ -83,7 +84,7 @@ export const MembershipsTab: React.FC<Props> = ({ currentLang, addToast, addActi
   const handleManualCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameAr || !passportId || !email || !phone) {
-      alert('Please fill required fields');
+      alertDialog('Please fill required fields');
       return;
     }
 

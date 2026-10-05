@@ -3,6 +3,7 @@ import { Sponsor, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, ExternalLink, Award } from 'lucide-react';
 import { ImageUploadInput } from '../common/ImageUploadInput';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -45,8 +46,8 @@ export const SponsorsTab: React.FC<Props> = ({ currentLang, addToast, addActivit
     setIsAdding(true);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف الشريك "${name}"؟` : `Delete sponsor "${name}"?`)) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف الشريك "${name}"؟` : `Delete sponsor "${name}"?`))) return;
     const updated = sponsors.filter(s => s.id !== id);
     db.saveSponsors(updated);
     setSponsors(updated);
@@ -57,7 +58,7 @@ export const SponsorsTab: React.FC<Props> = ({ currentLang, addToast, addActivit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameAr || !logo) {
-      alert('Please fill required fields');
+      alertDialog('Please fill required fields');
       return;
     }
 

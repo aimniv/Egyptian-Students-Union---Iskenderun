@@ -3,6 +3,7 @@ import { BoardMember, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, User, Mail, Phone, ExternalLink } from 'lucide-react';
 import { ImageUploadInput } from '../common/ImageUploadInput';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -76,8 +77,8 @@ export const BoardTab: React.FC<Props> = ({ currentLang, addToast, addActivityLo
     setIsAdding(true);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف العضو ${name}؟` : `Delete member ${name}?`)) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف العضو ${name}؟` : `Delete member ${name}?`))) return;
     const updated = board.filter(b => b.id !== id);
     db.saveBoardMembers(updated);
     setBoard(updated);
@@ -88,7 +89,7 @@ export const BoardTab: React.FC<Props> = ({ currentLang, addToast, addActivityLo
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameAr || !email) {
-      alert('Please fill required fields');
+      alertDialog('Please fill required fields');
       return;
     }
 

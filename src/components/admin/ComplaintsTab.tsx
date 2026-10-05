@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Complaint, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { AlertTriangle, Trash2, Edit, CheckCircle, MessageSquare } from 'lucide-react';
+import { confirmDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -58,8 +59,8 @@ export const ComplaintsTab: React.FC<Props> = ({ currentLang, addToast, addActiv
     addToast('Internal audit notes saved', 'success');
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('Delete ticket?')) return;
+  const handleDelete = async (id: string) => {
+    if (!(await confirmDialog('Delete ticket?'))) return;
     const updated = complaints.filter(c => c.id !== id);
     db.saveComplaints(updated);
     setComplaints(updated);

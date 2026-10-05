@@ -23,6 +23,7 @@ import {
   Send, Phone, HelpCircle, CheckCircle, ArrowRight, Download, Eye, 
   HeartHandshake, ChevronRight, ChevronLeft, Volume2, User, BookOpen, QrCode
 } from 'lucide-react';
+import { alertDialog } from '../lib/dialog';
 
 interface ClientPortalProps {
   currentLang: Language;
@@ -127,7 +128,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const handleMembershipSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullNameAr || !fullNameEn || !passportId || !email || !phone || !address) {
-      alert(isRtl ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
+      alertDialog(isRtl ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
       return;
     }
 
@@ -138,7 +139,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         university: univ, faculty, major, academicYear: year, residenceAddress: address, type: membershipType,
       }));
     } catch (err) {
-      alert(submitErrorText(err));
+      alertDialog(submitErrorText(err));
       return;
     }
 
@@ -165,7 +166,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       setTrackedMembership(record);
     } catch (err) {
       setTrackedMembership(null);
-      alert(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'عذراً، لم يتم العثور على أي طلب بهذا الرمز.' : 'Sorry, no membership application was found with this code.'));
+      alertDialog(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'عذراً، لم يتم العثور على أي طلب بهذا الرمز.' : 'Sorry, no membership application was found with this code.'));
     }
   };
 
@@ -173,7 +174,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactName || !contactEmail || !contactMsg) {
-      alert(isRtl ? 'الرجاء ملء الحقول الإجبارية' : 'Please fill all compulsory fields');
+      alertDialog(isRtl ? 'الرجاء ملء الحقول الإجبارية' : 'Please fill all compulsory fields');
       return;
     }
 
@@ -183,7 +184,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         subject: contactSubject || (isRtl ? 'استفسار عام' : 'General Inquiry'), message: contactMsg, language: currentLang,
       });
     } catch (err) {
-      alert(submitErrorText(err));
+      alertDialog(submitErrorText(err));
       return;
     }
 
@@ -201,7 +202,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const handleComplaintSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!complaintName || !complaintEmail || !complaintDetails || !complaintSub) {
-      alert(isRtl ? 'الرجاء تعبئة حقول النموذج بالكامل' : 'Please complete the ticket form details');
+      alertDialog(isRtl ? 'الرجاء تعبئة حقول النموذج بالكامل' : 'Please complete the ticket form details');
       return;
     }
 
@@ -212,7 +213,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         subject: complaintSub, details: complaintDetails, priority: complaintPriority,
       }));
     } catch (err) {
-      alert(submitErrorText(err));
+      alertDialog(submitErrorText(err));
       return;
     }
 
@@ -235,7 +236,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       setTrackedComplaint(record);
     } catch (err) {
       setTrackedComplaint(null);
-      alert(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'لم يتم العثور على تذكرة بهذا الرقم.' : 'Ticket not found.'));
+      alertDialog(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'لم يتم العثور على تذكرة بهذا الرقم.' : 'Ticket not found.'));
     }
   };
 
@@ -245,7 +246,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     if (!registeringEvent) return;
 
     if (!regName || !regEmail || !regPhone) {
-      alert(isRtl ? 'يرجى تعبئة الحقول الإلزامية' : 'Please fill all mandatory fields');
+      alertDialog(isRtl ? 'يرجى تعبئة الحقول الإلزامية' : 'Please fill all mandatory fields');
       return;
     }
 
@@ -255,7 +256,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         eventId: registeringEvent.id, name: regName, email: regEmail, phone: regPhone, whatsapp: regWhatsapp || regPhone,
       }));
     } catch (err) {
-      alert(submitErrorText(err));
+      alertDialog(submitErrorText(err));
       return;
     }
 
@@ -481,7 +482,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                         </div>
                         <button 
                           onClick={() => {
-                            alert(currentLang === 'ar' ? `رمز التحقق للحضور الشخصي هو: ${ev.qrCodeValue}` : `Verification value: ${ev.qrCodeValue}`);
+                            alertDialog(currentLang === 'ar' ? `رمز التحقق للحضور الشخصي هو: ${ev.qrCodeValue}` : `Verification value: ${ev.qrCodeValue}`);
                           }}
                           className="px-2 py-1 bg-green-600 text-white rounded font-bold text-[10px]"
                         >
@@ -1363,7 +1364,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 <div className="p-5 pt-0 border-t border-slate-50">
                   <button 
                     onClick={() => {
-                      alert(currentLang === 'ar' ? 'جاري محاكاة تنزيل الملف المرفق!' : 'Downloading attached resource mock...');
+                      alertDialog(currentLang === 'ar' ? 'جاري محاكاة تنزيل الملف المرفق!' : 'Downloading attached resource mock...');
                     }}
                     className="w-full py-1.5 border border-[#C8B273] text-[#163A4A] font-bold text-xs rounded hover:bg-[#163A4A] hover:text-white transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
                   >

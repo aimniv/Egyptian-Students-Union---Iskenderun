@@ -7,6 +7,7 @@ import { ClientPortal } from './components/ClientPortal';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminLogin } from './components/AdminLogin';
 import { adminApi, AdminSession } from './lib/adminApi';
+import { DialogHost } from './lib/dialog';
 import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
 
 interface Toast {
@@ -315,6 +316,8 @@ export default function App() {
           />
         </>
       )}
+
+      <DialogHost />
 
       {/* Toast Notification Container Overlay */}
       <div className="fixed bottom-5 right-5 left-5 md:left-auto md:right-5 z-[200] max-w-sm w-full space-y-2.5">
