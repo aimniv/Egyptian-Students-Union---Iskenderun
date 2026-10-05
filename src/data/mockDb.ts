@@ -732,8 +732,199 @@ const INITIAL_ACTIVITY_LOGS: ActivityLog[] = [
 ];
 
 // ------------------ LOCAL STORAGE DATABASE MANAGER ------------------
+//
+// Reads and writes stay synchronous against localStorage (a cache). The server is the source of truth:
+//  - public content is downloaded on every visit (hydrate) and administrators push their edits back;
+//  - private lists (applications, messages, complaints...) only exist locally while an administrator is signed in.
+
+type SyncScope = 'public' | 'private';
+
+const SYNC_MAP: Record<string, { scope: SyncScope; name: string }> = {
+  mob_board_members: { scope: 'public', name: 'board' },
+  mob_guides: { scope: 'public', name: 'guides' },
+  mob_events: { scope: 'public', name: 'events' },
+  mob_activities: { scope: 'public', name: 'activities' },
+  mob_announcements: { scope: 'public', name: 'announcements' },
+  mob_media_items: { scope: 'public', name: 'media' },
+  mob_sponsors: { scope: 'public', name: 'sponsors' },
+  mob_settings: { scope: 'public', name: 'settings' },
+  mob_translations: { scope: 'public', name: 'translations' },
+  mob_memberships: { scope: 'private', name: 'memberships' },
+  mob_contact_messages: { scope: 'private', name: 'messages' },
+  mob_complaints: { scope: 'private', name: 'complaints' },
+  mob_registrations: { scope: 'private', name: 'registrations' },
+  mob_volunteers: { scope: 'private', name: 'volunteers' },
+  mob_activity_logs: { scope: 'private', name: 'activityLogs' },
+};
+
+const keyOf = (scope: SyncScope, name: string) =>
+  Object.keys(SYNC_MAP).find((k) => SYNC_MAP[k].scope === scope && SYNC_MAP[k].name === name)!;
+
+export const SYNC_ERROR_EVENT = 'mob:sync-error';
+
+const emitSyncError = (code: string) => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(SYNC_ERROR_EVENT, { detail: { code } }));
+};
+
+async function api(method: string, url: string, body?: unknown): Promise<any> {
+  const res = await fetch(url, {
+    method,
+    credentials: 'same-origin',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(8000),
+  });
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    // not JSON: the API is not served here
+  }
+  if (!res.ok || data === null) throw new Error(data?.error || 'unreachable');
+  return data;
+}
 
 class LocalDatabase {
+  private admin = false;
+  private snapshots: Record<string, Map<string, string>> = {};
+  private timers: Record<string, ReturnType<typeof setTimeout>> = {};
+  private chain: Promise<void> = Promise.resolve();
+
+  /** Public getters used to seed the server the first time an administrator signs in. */
+  private publicDefaults(): Record<string, () => unknown> {
+    return {
+      board: () => this.getBoardMembers(),
+      guides: () => this.getGuides(),
+      events: () => this.getEvents(),
+      activities: () => this.getActivities(),
+      announcements: () => this.getAnnouncements(),
+      media: () => this.getMediaItems(),
+      sponsors: () => this.getSponsors(),
+      settings: () => this.getSettings(),
+      translations: () => this.getTranslations(),
+    };
+  }
+
+  /**
+   * Downloads the server's content into the local cache. Never throws: when the server cannot be
+   * reached the visitor simply keeps whatever is cached locally (or the built-in defaults).
+   */
+  async hydrate(admin: boolean): Promise<void> {
+    this.admin = admin;
+    try {
+      const { content } = await api('GET', '/api/content' + (admin ? `?fresh=${Date.now()}` : ''));
+      const missing: string[] = [];
+      for (const [localKey, m] of Object.entries(SYNC_MAP)) {
+        if (m.scope !== 'public') continue;
+        if (content && m.name in content) localStorage.setItem(localKey, JSON.stringify(content[m.name]));
+        else missing.push(m.name);
+      }
+      // First administrator sign-in: publish the current content so visitors see it too.
+      if (admin) {
+        const defaults = this.publicDefaults();
+        for (const name of missing) await this.pushPublic(name, defaults[name]());
+      }
+    } catch {
+      // keep the cache
+    }
+    if (admin) await this.hydratePrivate();
+  }
+
+  private async hydratePrivate(): Promise<void> {
+    try {
+      const { data } = await api('GET', `/api/private?fresh=${Date.now()}`);
+      for (const [localKey, m] of Object.entries(SYNC_MAP)) {
+        if (m.scope !== 'private') continue;
+        const list: { id: string }[] = Array.isArray(data?.[m.name]) ? data[m.name] : [];
+        localStorage.setItem(localKey, JSON.stringify(list));
+        this.snapshots[m.name] = new Map(list.map((i) => [i.id, JSON.stringify(i)]));
+      }
+    } catch {
+      this.snapshots = {}; // without a baseline, private edits would be unsafe: block them
+      emitSyncError('private_load_failed');
+    }
+  }
+
+  /** Called when an administrator signs out: forget private data held in this browser. */
+  setAdmin(admin: boolean) {
+    this.admin = admin;
+    if (!admin) {
+      this.snapshots = {};
+      Object.values(this.timers).forEach(clearTimeout);
+      this.timers = {};
+      for (const [localKey, m] of Object.entries(SYNC_MAP)) if (m.scope === 'private') localStorage.removeItem(localKey);
+    }
+  }
+
+  private async pushPublic(name: string, value: unknown) {
+    try {
+      await api('PUT', `/api/content?key=${name}`, { value });
+    } catch (e) {
+      emitSyncError(e instanceof Error ? e.message : 'unknown');
+    }
+  }
+
+  private async pushPrivate(name: string, list: { id?: string }[]) {
+    const snap = this.snapshots[name];
+    if (!snap) return;
+    const items = list.filter((i) => i && typeof i.id === 'string') as { id: string }[];
+    const upsert = items.filter((i) => snap.get(i.id) !== JSON.stringify(i));
+    const ids = new Set(items.map((i) => i.id));
+    const remove = [...snap.keys()].filter((id) => !ids.has(id));
+    if (!upsert.length && !remove.length) return;
+    try {
+      await api('PATCH', `/api/private?key=${name}`, { upsert, remove });
+      this.snapshots[name] = new Map(items.map((i) => [i.id, JSON.stringify(i)]));
+    } catch (e) {
+      emitSyncError(e instanceof Error ? e.message : 'unknown');
+    }
+  }
+
+  private queuePush(localKey: string) {
+    const m = SYNC_MAP[localKey];
+    if (!this.admin || !m) return;
+    clearTimeout(this.timers[localKey]);
+    this.timers[localKey] = setTimeout(() => {
+      delete this.timers[localKey];
+      this.chain = this.chain
+        .then(() => {
+          const raw = localStorage.getItem(localKey);
+          if (raw === null) return;
+          const value = JSON.parse(raw);
+          return m.scope === 'public' ? this.pushPublic(m.name, value) : this.pushPrivate(m.name, value);
+        })
+        .catch(() => undefined);
+    }, 400);
+  }
+
+  /** Sends edits that are still waiting out their short debounce delay. */
+  private async flush(): Promise<void> {
+    const pending = Object.keys(this.timers);
+    this.timers = {};
+    for (const localKey of pending) {
+      const m = SYNC_MAP[localKey];
+      const raw = localStorage.getItem(localKey);
+      if (!m || raw === null) continue;
+      const value = JSON.parse(raw);
+      this.chain = this.chain.then(() => (m.scope === 'public' ? this.pushPublic(m.name, value) : this.pushPrivate(m.name, value)));
+    }
+    await this.chain;
+  }
+
+  /**
+   * Re-downloads everything an administrator can see (new applications, messages, edits by other
+   * administrators). Resolves to true when something actually changed.
+   */
+  async refreshAdminData(): Promise<boolean> {
+    if (!this.admin) return false;
+    Object.values(this.timers).forEach(clearTimeout);
+    await this.flush();
+    const signature = () => Object.keys(SYNC_MAP).map((k) => localStorage.getItem(k)).join('\u0000');
+    const before = signature();
+    await this.hydrate(true);
+    return signature() !== before;
+  }
+
   private get<T>(key: string, defaultValue: T): T {
     try {
       const data = localStorage.getItem(key);
@@ -748,7 +939,9 @@ class LocalDatabase {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
       console.error('Local Storage Save Error:', e);
+      return;
     }
+    this.queuePush(key);
   }
 
   // Board Members

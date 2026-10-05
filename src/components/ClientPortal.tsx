@@ -15,6 +15,8 @@ import {
   EventRegistration
 } from '../types';
 import { db } from '../data/mockDb';
+import { siteApi } from '../lib/siteApi';
+import { ApiError } from '../lib/adminApi';
 import { LogoCrest } from './Header';
 import { 
   Search, Calendar, Clock, MapPin, Users, Award, Shield, FileText, 
@@ -113,37 +115,32 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
   const isRtl = currentLang === 'ar';
 
+  const submitErrorText = (err: unknown): string => {
+    const code = err instanceof ApiError ? err.code : '';
+    if (code === 'too_many_attempts') return isRtl ? 'محاولات كثيرة، حاول لاحقاً' : currentLang === 'tr' ? 'Çok fazla deneme, daha sonra tekrar deneyin' : 'Too many attempts, please try later';
+    if (code === 'invalid_input') return isRtl ? 'يرجى التحقق من البيانات المدخلة (البريد الإلكتروني صحيح؟)' : currentLang === 'tr' ? 'Lütfen girdiğiniz bilgileri kontrol edin (e-posta geçerli mi?)' : 'Please check the data you entered (is the email valid?)';
+    if (code === 'event_full') return isRtl ? 'عذراً، اكتمل عدد المقاعد' : currentLang === 'tr' ? 'Üzgünüz, kontenjan doldu' : 'Sorry, this event is full';
+    return isRtl ? 'تعذر الإرسال حالياً، حاول مرة أخرى' : currentLang === 'tr' ? 'Şu anda gönderilemedi, tekrar deneyin' : 'Could not send right now, please try again';
+  };
+
   // Membership Submission handler
-  const handleMembershipSubmit = (e: React.FormEvent) => {
+  const handleMembershipSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullNameAr || !fullNameEn || !passportId || !email || !phone || !address) {
       alert(isRtl ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
       return;
     }
 
-    const uniqueId = 'MEMB-' + Math.floor(100000 + Math.random() * 900000);
-    const newMembership: Membership = {
-      id: uniqueId,
-      studentNumber: 'MOB-ST-' + Math.floor(260000 + Math.random() * 999),
-      nameAr: fullNameAr,
-      nameEn: fullNameEn,
-      passportOrId: passportId,
-      email,
-      phone,
-      whatsapp: whatsapp || phone,
-      university: univ,
-      faculty,
-      major,
-      academicYear: year,
-      residenceAddress: address,
-      status: 'pending',
-      appliedDate: new Date().toISOString().split('T')[0],
-      type: membershipType
-    };
-
-    const currentMemberships = db.getMemberships();
-    currentMemberships.push(newMembership);
-    db.saveMemberships(currentMemberships);
+    let uniqueId: string;
+    try {
+      ({ code: uniqueId } = await siteApi.submit('membership', {
+        nameAr: fullNameAr, nameEn: fullNameEn, passportOrId: passportId, email, phone, whatsapp: whatsapp || phone,
+        university: univ, faculty, major, academicYear: year, residenceAddress: address, type: membershipType,
+      }));
+    } catch (err) {
+      alert(submitErrorText(err));
+      return;
+    }
 
     setTrackingCode(uniqueId);
     addToast(isRtl ? 'تم تقديم طلب العضوية بنجاح!' : 'Membership application submitted successfully!', 'success');
@@ -161,41 +158,34 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   };
 
   // Membership Search/Track
-  const handleTrackMembership = () => {
+  const handleTrackMembership = async () => {
     if (!searchedCode) return;
-    const currentMemberships = db.getMemberships();
-    const found = currentMemberships.find(m => m.id === searchedCode.trim() || m.studentNumber === searchedCode.trim() || m.passportOrId === searchedCode.trim());
-    if (found) {
-      setTrackedMembership(found);
-    } else {
+    try {
+      const { record } = await siteApi.track<Membership>('membership', searchedCode);
+      setTrackedMembership(record);
+    } catch (err) {
       setTrackedMembership(null);
-      alert(isRtl ? 'عذراً، لم يتم العثور على أي طلب بهذه البيانات.' : 'Sorry, no membership application was found.');
+      alert(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'عذراً، لم يتم العثور على أي طلب بهذا الرمز.' : 'Sorry, no membership application was found with this code.'));
     }
   };
 
   // Contact form Submission
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactName || !contactEmail || !contactMsg) {
       alert(isRtl ? 'الرجاء ملء الحقول الإجبارية' : 'Please fill all compulsory fields');
       return;
     }
 
-    const newMsg: ContactMessage = {
-      id: 'MSG-' + Date.now(),
-      name: contactName,
-      email: contactEmail,
-      phone: contactPhone,
-      subject: contactSubject || (isRtl ? 'استفسار عام' : 'General Inquiry'),
-      message: contactMsg,
-      date: new Date().toISOString(),
-      language: currentLang,
-      status: 'new'
-    };
-
-    const inbox = db.getContactMessages();
-    inbox.push(newMsg);
-    db.saveContactMessages(inbox);
+    try {
+      await siteApi.submit('message', {
+        name: contactName, email: contactEmail, phone: contactPhone,
+        subject: contactSubject || (isRtl ? 'استفسار عام' : 'General Inquiry'), message: contactMsg, language: currentLang,
+      });
+    } catch (err) {
+      alert(submitErrorText(err));
+      return;
+    }
 
     addToast(isRtl ? 'تم إرسال رسالتكم للأمانة العامة بنجاح!' : 'Your message has been sent successfully!', 'success');
     
@@ -208,31 +198,23 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   };
 
   // Complaint system submission
-  const handleComplaintSubmit = (e: React.FormEvent) => {
+  const handleComplaintSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!complaintName || !complaintEmail || !complaintDetails || !complaintSub) {
       alert(isRtl ? 'الرجاء تعبئة حقول النموذج بالكامل' : 'Please complete the ticket form details');
       return;
     }
 
-    const ticketNo = 'MOB-REQ-2026-' + Math.floor(100 + Math.random() * 900);
-    const newComplaint: Complaint = {
-      id: 'COMP-' + Date.now(),
-      ticketNumber: ticketNo,
-      name: complaintName,
-      email: complaintEmail,
-      phone: complaintPhone,
-      category: complaintCat,
-      subject: complaintSub,
-      details: complaintDetails,
-      date: new Date().toISOString(),
-      status: 'new',
-      priority: complaintPriority
-    };
-
-    const currentComplaints = db.getComplaints();
-    currentComplaints.push(newComplaint);
-    db.saveComplaints(currentComplaints);
+    let ticketNo: string;
+    try {
+      ({ code: ticketNo } = await siteApi.submit('complaint', {
+        name: complaintName, email: complaintEmail, phone: complaintPhone, category: complaintCat,
+        subject: complaintSub, details: complaintDetails, priority: complaintPriority,
+      }));
+    } catch (err) {
+      alert(submitErrorText(err));
+      return;
+    }
 
     setComplaintTicketCreated(ticketNo);
     addToast(isRtl ? 'تم تسجيل شكواكم كطلب رسمي!' : 'Your complaint has been logged as a ticket!', 'success');
@@ -246,20 +228,19 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   };
 
   // Complaint track
-  const handleTrackComplaint = () => {
+  const handleTrackComplaint = async () => {
     if (!trackedTicketCode) return;
-    const currentComplaints = db.getComplaints();
-    const found = currentComplaints.find(c => c.ticketNumber === trackedTicketCode.trim());
-    if (found) {
-      setTrackedComplaint(found);
-    } else {
+    try {
+      const { record } = await siteApi.track<Complaint>('complaint', trackedTicketCode);
+      setTrackedComplaint(record);
+    } catch (err) {
       setTrackedComplaint(null);
-      alert(isRtl ? 'لم يتم العثور على تذكرة بهذا الرقم.' : 'Ticket not found.');
+      alert(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'لم يتم العثور على تذكرة بهذا الرقم.' : 'Ticket not found.'));
     }
   };
 
   // Event Registration Submission
-  const handleEventRegisterSubmit = (e: React.FormEvent) => {
+  const handleEventRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registeringEvent) return;
 
@@ -268,31 +249,18 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       return;
     }
 
-    const ticketCode = 'TKT-' + Math.floor(1000 + Math.random() * 9000);
-    const newReg: EventRegistration = {
-      id: ticketCode,
-      eventId: registeringEvent.id,
-      name: regName,
-      email: regEmail,
-      phone: regPhone,
-      whatsapp: regWhatsapp || regPhone,
-      registeredDate: new Date().toISOString(),
-      attended: false
-    };
+    let ticketCode: string;
+    try {
+      ({ code: ticketCode } = await siteApi.submit('registration', {
+        eventId: registeringEvent.id, name: regName, email: regEmail, phone: regPhone, whatsapp: regWhatsapp || regPhone,
+      }));
+    } catch (err) {
+      alert(submitErrorText(err));
+      return;
+    }
 
-    const regs = db.getRegistrations();
-    regs.push(newReg);
-    db.saveRegistrations(regs);
-
-    // Increment registered count
-    const updatedEvents = events.map(ev => {
-      if (ev.id === registeringEvent.id) {
-        return { ...ev, registeredCount: ev.registeredCount + 1 };
-      }
-      return ev;
-    });
-    setEvents(updatedEvents);
-    db.saveEvents(updatedEvents);
+    // The server keeps the real counter; mirror it here so the page updates immediately.
+    setEvents(events.map(ev => (ev.id === registeringEvent.id ? { ...ev, registeredCount: ev.registeredCount + 1 } : ev)));
 
     // Save ticket locally
     setRegisteredTickets(prev => ({ ...prev, [registeringEvent.id]: ticketCode }));

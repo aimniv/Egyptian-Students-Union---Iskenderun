@@ -2,6 +2,7 @@ import { Redis } from '@upstash/redis';
 
 export interface Store {
   get<T>(key: string): Promise<T | null>;
+  mget<T>(...keys: string[]): Promise<(T | null)[]>;
   set(key: string, value: unknown, ttlSec?: number): Promise<void>;
   del(...keys: string[]): Promise<void>;
   /** Increments a counter; the TTL is set when the counter is created. */
@@ -25,6 +26,9 @@ class MemoryStore implements Store {
   }
   async get<T>(key: string) {
     return (this.live(key)?.value as T) ?? null;
+  }
+  async mget<T>(...keys: string[]) {
+    return keys.map((k) => (this.live(k)?.value as T) ?? null);
   }
   async set(key: string, value: unknown, ttlSec?: number) {
     this.data.set(key, { value, exp: ttlSec ? Date.now() + ttlSec * 1000 : null });
@@ -57,6 +61,9 @@ class UpstashStore implements Store {
   constructor(private r: Redis) {}
   get<T>(key: string) {
     return this.r.get<T>(key);
+  }
+  async mget<T>(...keys: string[]) {
+    return keys.length ? ((await this.r.mget<(T | null)[]>(...keys)) as (T | null)[]) : [];
   }
   async set(key: string, value: unknown, ttlSec?: number) {
     if (ttlSec) await this.r.set(key, value, { ex: ttlSec });
