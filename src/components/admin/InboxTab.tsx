@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ContactMessage, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Mail, Trash2, Archive, Send, Search, CheckCircle } from 'lucide-react';
+import { confirmDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -51,8 +52,8 @@ export const InboxTab: React.FC<Props> = ({ currentLang, addToast, addActivityLo
     if (selectedMsg?.id === id) setSelectedMsg(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('Delete message?')) return;
+  const handleDelete = async (id: string) => {
+    if (!(await confirmDialog('Delete message?'))) return;
     const updated = messages.filter(m => m.id !== id);
     db.saveContactMessages(updated);
     setMessages(updated);

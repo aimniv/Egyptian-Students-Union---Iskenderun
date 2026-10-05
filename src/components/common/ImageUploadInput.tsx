@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Link as LinkIcon, Image as ImageIcon, X, Check } from 'lucide-react';
+import { alertDialog } from '../../lib/dialog';
 
 interface ImageUploadInputProps {
   label: string;
@@ -32,7 +33,7 @@ export const ImageUploadInput: React.FC<ImageUploadInputProps> = ({
   const processFile = (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WEBP vb.)');
+      alertDialog('Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WEBP vb.)');
       return;
     }
 

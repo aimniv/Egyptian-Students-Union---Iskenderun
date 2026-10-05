@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Language } from '../../types';
 import { adminApi, AdminAccount, ApiError } from '../../lib/adminApi';
 import { UserPlus, Trash2, Mail } from 'lucide-react';
+import { confirmDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -74,7 +75,7 @@ export const AdminAccounts: React.FC<Props> = ({ currentLang, adminEmail, addToa
   };
 
   const handleRemove = async (target: string) => {
-    if (!confirm(t.confirm)) return;
+    if (!(await confirmDialog(t.confirm))) return;
     try {
       await adminApi.removeAdmin(target);
       addActivityLog('Admin removed', target);

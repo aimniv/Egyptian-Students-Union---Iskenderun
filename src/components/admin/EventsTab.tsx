@@ -3,6 +3,7 @@ import { Event, EventRegistration, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, Users, Calendar, QrCode, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { ImageUploadInput } from '../common/ImageUploadInput';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -74,8 +75,8 @@ export const EventsTab: React.FC<Props> = ({ currentLang, addToast, addActivityL
     setIsAdding(true);
   };
 
-  const handleDelete = (id: string, title: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف الفعالية "${title}"؟` : `Delete event "${title}"?`)) return;
+  const handleDelete = async (id: string, title: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف الفعالية "${title}"؟` : `Delete event "${title}"?`))) return;
     const updated = events.filter(e => e.id !== id);
     db.saveEvents(updated);
     setEvents(updated);
@@ -86,7 +87,7 @@ export const EventsTab: React.FC<Props> = ({ currentLang, addToast, addActivityL
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!titleAr || !date || !time) {
-      alert('Please fill required fields');
+      alertDialog('Please fill required fields');
       return;
     }
 

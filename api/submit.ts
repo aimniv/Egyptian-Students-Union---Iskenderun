@@ -2,6 +2,11 @@ import { randomInt } from 'node:crypto';
 import { getStore } from './_lib/store.js';
 import { allow, clientIp, json, normalizeEmail, readJson, sameOriginOk } from './_lib/auth.js';
 import { byteSize, MAX_BYTES, MAX_ITEMS, publicKey, readList, writeList } from './_lib/content.js';
+import { photoKey } from './photo.js';
+
+// A 480x600 JPEG is roughly 40-80 KB; anything bigger than this is not a card photo.
+const PHOTO = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/;
+const MAX_PHOTO_CHARS = 250_000;
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const code = (n: number) => Array.from({ length: n }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
@@ -33,11 +38,16 @@ async function handle(req: Request): Promise<Response> {
     const phone = str(d.phone, 40);
     if (!email || !(nameAr || nameEn) || !passportOrId || !phone) return json(400, { error: 'invalid_input' });
     const id = 'MEMB-' + code(8);
+    const photoData = typeof d.photo === 'string' ? d.photo : '';
+    const photoMatch = photoData ? PHOTO.exec(photoData) : null;
+    if (photoData && (!photoMatch || photoData.length > MAX_PHOTO_CHARS)) return json(400, { error: 'invalid_photo' });
+    if (photoMatch) await getStore().set(photoKey(id), { b64: photoMatch[1] });
     await append('memberships', {
       id, studentNumber: 'MOB-ST-' + (260000 + randomInt(0, 1000)), nameAr, nameEn, passportOrId, email, phone,
       whatsapp: str(d.whatsapp, 40) || phone, university: str(d.university, 160), faculty: str(d.faculty, 160),
       major: str(d.major, 160), academicYear: str(d.academicYear, 40), residenceAddress: str(d.residenceAddress, 300),
       status: 'pending', appliedDate: now.slice(0, 10), type: pick(d.type, ['new', 'renewal'] as const, 'new'),
+      ...(photoMatch ? { photoUrl: `/api/photo?id=${id}` } : {}),
     });
     return json(201, { code: id });
   }

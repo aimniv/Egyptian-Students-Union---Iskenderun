@@ -16,13 +16,15 @@ import {
 } from '../types';
 import { db } from '../data/mockDb';
 import { siteApi } from '../lib/siteApi';
+import { fileToCardPhoto } from '../lib/image';
 import { ApiError } from '../lib/adminApi';
 import { LogoCrest } from './Header';
 import { 
   Search, Calendar, Clock, MapPin, Users, Award, Shield, FileText, 
   Send, Phone, HelpCircle, CheckCircle, ArrowRight, Download, Eye, 
-  HeartHandshake, ChevronRight, ChevronLeft, Volume2, User, BookOpen, QrCode
+  HeartHandshake, ChevronRight, ChevronLeft, Volume2, User, BookOpen, QrCode, Upload
 } from 'lucide-react';
+import { alertDialog } from '../lib/dialog';
 
 interface ClientPortalProps {
   currentLang: Language;
@@ -67,6 +69,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [major, setMajor] = useState('');
   const [year, setYear] = useState('1');
   const [address, setAddress] = useState('');
+  const [photo, setPhoto] = useState('');
   const [trackingCode, setTrackingCode] = useState('');
   const [searchedCode, setSearchedCode] = useState('');
   const [trackedMembership, setTrackedMembership] = useState<Membership | null>(null);
@@ -119,6 +122,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     const code = err instanceof ApiError ? err.code : '';
     if (code === 'too_many_attempts') return isRtl ? 'محاولات كثيرة، حاول لاحقاً' : currentLang === 'tr' ? 'Çok fazla deneme, daha sonra tekrar deneyin' : 'Too many attempts, please try later';
     if (code === 'invalid_input') return isRtl ? 'يرجى التحقق من البيانات المدخلة (البريد الإلكتروني صحيح؟)' : currentLang === 'tr' ? 'Lütfen girdiğiniz bilgileri kontrol edin (e-posta geçerli mi?)' : 'Please check the data you entered (is the email valid?)';
+    if (code === 'invalid_photo') return isRtl ? 'الصورة غير صالحة، اختر صورة أخرى' : currentLang === 'tr' ? 'Fotoğraf geçersiz, başka bir fotoğraf seçin' : 'The photo is not valid, please choose another one';
     if (code === 'event_full') return isRtl ? 'عذراً، اكتمل عدد المقاعد' : currentLang === 'tr' ? 'Üzgünüz, kontenjan doldu' : 'Sorry, this event is full';
     return isRtl ? 'تعذر الإرسال حالياً، حاول مرة أخرى' : currentLang === 'tr' ? 'Şu anda gönderilemedi, tekrar deneyin' : 'Could not send right now, please try again';
   };
@@ -127,7 +131,11 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const handleMembershipSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullNameAr || !fullNameEn || !passportId || !email || !phone || !address) {
-      alert(isRtl ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
+      alertDialog(isRtl ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
+      return;
+    }
+    if (!photo) {
+      alertDialog(isRtl ? 'يرجى إضافة صورتك الشخصية للبطاقة' : currentLang === 'tr' ? 'Lütfen kart için vesikalık fotoğrafınızı ekleyin' : 'Please add your ID photo for the card');
       return;
     }
 
@@ -135,10 +143,10 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     try {
       ({ code: uniqueId } = await siteApi.submit('membership', {
         nameAr: fullNameAr, nameEn: fullNameEn, passportOrId: passportId, email, phone, whatsapp: whatsapp || phone,
-        university: univ, faculty, major, academicYear: year, residenceAddress: address, type: membershipType,
+        university: univ, faculty, major, academicYear: year, residenceAddress: address, type: membershipType, photo,
       }));
     } catch (err) {
-      alert(submitErrorText(err));
+      alertDialog(submitErrorText(err));
       return;
     }
 
@@ -155,6 +163,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     setFaculty('');
     setMajor('');
     setAddress('');
+    setPhoto('');
   };
 
   // Membership Search/Track
@@ -165,7 +174,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       setTrackedMembership(record);
     } catch (err) {
       setTrackedMembership(null);
-      alert(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'عذراً، لم يتم العثور على أي طلب بهذا الرمز.' : 'Sorry, no membership application was found with this code.'));
+      alertDialog(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'عذراً، لم يتم العثور على أي طلب بهذا الرمز.' : 'Sorry, no membership application was found with this code.'));
     }
   };
 
@@ -173,7 +182,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactName || !contactEmail || !contactMsg) {
-      alert(isRtl ? 'الرجاء ملء الحقول الإجبارية' : 'Please fill all compulsory fields');
+      alertDialog(isRtl ? 'الرجاء ملء الحقول الإجبارية' : 'Please fill all compulsory fields');
       return;
     }
 
@@ -183,7 +192,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         subject: contactSubject || (isRtl ? 'استفسار عام' : 'General Inquiry'), message: contactMsg, language: currentLang,
       });
     } catch (err) {
-      alert(submitErrorText(err));
+      alertDialog(submitErrorText(err));
       return;
     }
 
@@ -201,7 +210,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const handleComplaintSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!complaintName || !complaintEmail || !complaintDetails || !complaintSub) {
-      alert(isRtl ? 'الرجاء تعبئة حقول النموذج بالكامل' : 'Please complete the ticket form details');
+      alertDialog(isRtl ? 'الرجاء تعبئة حقول النموذج بالكامل' : 'Please complete the ticket form details');
       return;
     }
 
@@ -212,7 +221,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         subject: complaintSub, details: complaintDetails, priority: complaintPriority,
       }));
     } catch (err) {
-      alert(submitErrorText(err));
+      alertDialog(submitErrorText(err));
       return;
     }
 
@@ -235,7 +244,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       setTrackedComplaint(record);
     } catch (err) {
       setTrackedComplaint(null);
-      alert(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'لم يتم العثور على تذكرة بهذا الرقم.' : 'Ticket not found.'));
+      alertDialog(err instanceof ApiError && err.code !== 'not_found' ? submitErrorText(err) : (isRtl ? 'لم يتم العثور على تذكرة بهذا الرقم.' : 'Ticket not found.'));
     }
   };
 
@@ -245,7 +254,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     if (!registeringEvent) return;
 
     if (!regName || !regEmail || !regPhone) {
-      alert(isRtl ? 'يرجى تعبئة الحقول الإلزامية' : 'Please fill all mandatory fields');
+      alertDialog(isRtl ? 'يرجى تعبئة الحقول الإلزامية' : 'Please fill all mandatory fields');
       return;
     }
 
@@ -255,7 +264,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         eventId: registeringEvent.id, name: regName, email: regEmail, phone: regPhone, whatsapp: regWhatsapp || regPhone,
       }));
     } catch (err) {
-      alert(submitErrorText(err));
+      alertDialog(submitErrorText(err));
       return;
     }
 
@@ -481,7 +490,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                         </div>
                         <button 
                           onClick={() => {
-                            alert(currentLang === 'ar' ? `رمز التحقق للحضور الشخصي هو: ${ev.qrCodeValue}` : `Verification value: ${ev.qrCodeValue}`);
+                            alertDialog(currentLang === 'ar' ? `رمز التحقق للحضور الشخصي هو: ${ev.qrCodeValue}` : `Verification value: ${ev.qrCodeValue}`);
                           }}
                           className="px-2 py-1 bg-green-600 text-white rounded font-bold text-[10px]"
                         >
@@ -828,6 +837,50 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 <textarea required rows={3} value={address} onChange={(e) => setAddress(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded text-sm font-sans" placeholder="e.g. Hatay, İskenderun, Cumhuriyet Mahallesi..." />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  {isRtl ? 'الصورة الشخصية (للبطاقة)' : currentLang === 'tr' ? 'Vesikalık fotoğraf (kart için)' : 'ID photo (for the card)'} *
+                </label>
+                <div className="flex items-center gap-4">
+                  <div className="h-28 w-[5.6rem] shrink-0 rounded border-2 border-dashed border-slate-300 bg-slate-50 overflow-hidden flex items-center justify-center text-slate-300">
+                    {photo ? (
+                      <img src={photo} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <User className="h-8 w-8" />
+                    )}
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded bg-[#163A4A] text-[#C8B273] font-bold cursor-pointer hover:bg-[#24495D]">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{photo ? (isRtl ? 'تغيير الصورة' : currentLang === 'tr' ? 'Fotoğrafı değiştir' : 'Change photo') : (isRtl ? 'اختر صورة' : currentLang === 'tr' ? 'Fotoğraf seç' : 'Choose photo')}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (!file) return;
+                          try {
+                            setPhoto(await fileToCardPhoto(file));
+                          } catch {
+                            alertDialog(isRtl ? 'تعذر قراءة الصورة، اختر ملف صورة آخر' : currentLang === 'tr' ? 'Fotoğraf okunamadı, başka bir dosya seçin' : 'Could not read the picture, please choose another image file');
+                          }
+                        }}
+                      />
+                    </label>
+                    {photo && (
+                      <button type="button" onClick={() => setPhoto('')} className="block text-red-600 hover:underline cursor-pointer">
+                        {isRtl ? 'إزالة' : currentLang === 'tr' ? 'Kaldır' : 'Remove'}
+                      </button>
+                    )}
+                    <p className="text-slate-500">
+                      {isRtl ? 'صورة واضحة للوجه بخلفية سادة. تُقصّ تلقائياً بنسبة 4:5.' : currentLang === 'tr' ? 'Yüzün net göründüğü, sade arka planlı bir fotoğraf. Otomatik olarak 4:5 kırpılır.' : 'A clear face photo on a plain background. It is cropped to 4:5 automatically.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-2">
                 <button type="submit" className="w-full py-3 bg-[#163A4A] text-white font-bold rounded shadow hover:bg-[#24495D] transition-colors cursor-pointer text-sm">
                   {t('membership.submitBtn')}
@@ -914,11 +967,17 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                         <div className="grid grid-cols-4 gap-3">
                           {/* Left avatar photo */}
                           <div className="col-span-1 flex flex-col items-center justify-center space-y-1">
-                            <img 
-                              src={trackedMembership.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} 
-                              alt="Student" 
-                              className="h-20 w-16 object-cover rounded border border-[#C8B273]/50 bg-slate-800"
-                            />
+                            {trackedMembership.photoUrl ? (
+                              <img
+                                src={trackedMembership.photoUrl}
+                                alt="Student"
+                                className="h-20 w-16 object-cover rounded border border-[#C8B273]/50 bg-slate-800"
+                              />
+                            ) : (
+                              <div className="h-20 w-16 rounded border border-dashed border-[#C8B273]/50 bg-slate-800 flex items-center justify-center text-slate-500">
+                                <User className="h-7 w-7" />
+                              </div>
+                            )}
                             <span className="text-[7px] font-mono text-slate-400">ID PHOTO</span>
                           </div>
 
@@ -1363,7 +1422,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 <div className="p-5 pt-0 border-t border-slate-50">
                   <button 
                     onClick={() => {
-                      alert(currentLang === 'ar' ? 'جاري محاكاة تنزيل الملف المرفق!' : 'Downloading attached resource mock...');
+                      alertDialog(currentLang === 'ar' ? 'جاري محاكاة تنزيل الملف المرفق!' : 'Downloading attached resource mock...');
                     }}
                     className="w-full py-1.5 border border-[#C8B273] text-[#163A4A] font-bold text-xs rounded hover:bg-[#163A4A] hover:text-white transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
                   >

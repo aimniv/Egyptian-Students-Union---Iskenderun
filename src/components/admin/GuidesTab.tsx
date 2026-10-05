@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StudentGuideSection, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, BookOpen, ExternalLink } from 'lucide-react';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -53,8 +54,8 @@ export const GuidesTab: React.FC<Props> = ({ currentLang, addToast, addActivityL
     setIsAdding(true);
   };
 
-  const handleDelete = (id: string, title: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف القسم "${title}"؟` : `Delete section "${title}"?`)) return;
+  const handleDelete = async (id: string, title: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف القسم "${title}"؟` : `Delete section "${title}"?`))) return;
     const updated = guides.filter(g => g.id !== id);
     db.saveGuides(updated);
     setGuides(updated);
@@ -65,7 +66,7 @@ export const GuidesTab: React.FC<Props> = ({ currentLang, addToast, addActivityL
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!titleAr || !contentAr) {
-      alert('Please fill out Title and Content in Arabic');
+      alertDialog('Please fill out Title and Content in Arabic');
       return;
     }
 

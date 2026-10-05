@@ -3,6 +3,7 @@ import { MediaItem, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, Image, Video, FileText, ExternalLink } from 'lucide-react';
 import { ImageUploadInput } from '../common/ImageUploadInput';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -48,8 +49,8 @@ export const MediaTab: React.FC<Props> = ({ currentLang, addToast, addActivityLo
     setIsAdding(true);
   };
 
-  const handleDelete = (id: string, title: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف العنصر "${title}"؟` : `Delete media item "${title}"?`)) return;
+  const handleDelete = async (id: string, title: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف العنصر "${title}"؟` : `Delete media item "${title}"?`))) return;
     const updated = media.filter(m => m.id !== id);
     db.saveMediaItems(updated);
     setMedia(updated);
@@ -60,7 +61,7 @@ export const MediaTab: React.FC<Props> = ({ currentLang, addToast, addActivityLo
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!titleAr || !url) {
-      alert('Please fill required fields');
+      alertDialog('Please fill required fields');
       return;
     }
 

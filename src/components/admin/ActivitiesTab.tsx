@@ -3,6 +3,7 @@ import { Activity, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, Calendar, ExternalLink } from 'lucide-react';
 import { ImageUploadInput } from '../common/ImageUploadInput';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -57,8 +58,8 @@ export const ActivitiesTab: React.FC<Props> = ({ currentLang, addToast, addActiv
     setIsAdding(true);
   };
 
-  const handleDelete = (id: string, title: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف النشاط "${title}"؟` : `Delete activity "${title}"?`)) return;
+  const handleDelete = async (id: string, title: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف النشاط "${title}"؟` : `Delete activity "${title}"?`))) return;
     const updated = activities.filter(a => a.id !== id);
     db.saveActivities(updated);
     setActivities(updated);
@@ -69,7 +70,7 @@ export const ActivitiesTab: React.FC<Props> = ({ currentLang, addToast, addActiv
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!titleAr || !date) {
-      alert('Please fill required fields');
+      alertDialog('Please fill required fields');
       return;
     }
 

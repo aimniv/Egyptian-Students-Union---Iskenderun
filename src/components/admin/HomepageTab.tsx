@@ -12,6 +12,7 @@ import {
   RotateCcw,
   CheckCircle2
 } from 'lucide-react';
+import { confirmDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -867,8 +868,8 @@ export const HomepageTab: React.FC<Props> = ({
         <div className="flex items-center justify-between pt-4 border-t">
           <button
             type="button"
-            onClick={() => {
-              if (confirm('Anasayfa içeriklerini başlangıç ayarlarına döndürmek istiyor musunuz?')) {
+            onClick={async () => {
+              if (await confirmDialog('Anasayfa içeriklerini başlangıç ayarlarına döndürmek istiyor musunuz?')) {
                 setHomepage(defaultHomepage);
                 addToast('Varsayılan anasayfa şablonu yüklendi', 'info');
               }

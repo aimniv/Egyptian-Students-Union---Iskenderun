@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Membership, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, Search, FileDown, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -49,7 +50,7 @@ export const MembershipsTab: React.FC<Props> = ({ currentLang, addToast, addActi
 
   const handleReject = (id: string) => {
     if (!rejectionReason) {
-      alert(currentLang === 'ar' ? 'يرجى كتابة سبب الرفض' : 'Please provide rejection reason');
+      alertDialog(currentLang === 'ar' ? 'يرجى كتابة سبب الرفض' : 'Please provide rejection reason');
       return;
     }
     const updated = memberships.map(m => {
@@ -70,8 +71,8 @@ export const MembershipsTab: React.FC<Props> = ({ currentLang, addToast, addActi
     setRejectionReason('');
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف ملف الطالب ${name}؟` : `Delete record for ${name}?`)) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف ملف الطالب ${name}؟` : `Delete record for ${name}?`))) return;
     const updated = memberships.filter(m => m.id !== id);
     db.saveMemberships(updated);
     setMemberships(updated);
@@ -83,7 +84,7 @@ export const MembershipsTab: React.FC<Props> = ({ currentLang, addToast, addActi
   const handleManualCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameAr || !passportId || !email || !phone) {
-      alert('Please fill required fields');
+      alertDialog('Please fill required fields');
       return;
     }
 
@@ -291,6 +292,12 @@ export const MembershipsTab: React.FC<Props> = ({ currentLang, addToast, addActi
               </div>
               <button onClick={() => setSelectedMemb(null)} className="text-xl">×</button>
             </div>
+
+            {selectedMemb.photoUrl && (
+              <div className="flex justify-center mb-3">
+                <img src={selectedMemb.photoUrl} alt="" className="h-36 w-[7.2rem] object-cover rounded-lg border-2 border-[#C8B273]/60 shadow-sm" />
+              </div>
+            )}
 
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border">

@@ -3,6 +3,7 @@ import { Announcement, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Plus, Trash2, Edit, Pin, Megaphone } from 'lucide-react';
 import { ImageUploadInput } from '../common/ImageUploadInput';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -57,8 +58,8 @@ export const AnnouncementsTab: React.FC<Props> = ({ currentLang, addToast, addAc
     setIsAdding(true);
   };
 
-  const handleDelete = (id: string, title: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف الإعلان "${title}"؟` : `Delete announcement "${title}"?`)) return;
+  const handleDelete = async (id: string, title: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف الإعلان "${title}"؟` : `Delete announcement "${title}"?`))) return;
     const updated = announcements.filter(a => a.id !== id);
     db.saveAnnouncements(updated);
     setAnnouncements(updated);
@@ -76,7 +77,7 @@ export const AnnouncementsTab: React.FC<Props> = ({ currentLang, addToast, addAc
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!titleAr || !contentAr) {
-      alert('Please fill required fields');
+      alertDialog('Please fill required fields');
       return;
     }
 

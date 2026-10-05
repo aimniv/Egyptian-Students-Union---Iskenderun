@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Volunteer, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { Check, X, Trash2, HeartHandshake, Phone, Mail } from 'lucide-react';
+import { confirmDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -21,8 +22,8 @@ export const VolunteersTab: React.FC<Props> = ({ currentLang, addToast, addActiv
     addToast(currentLang === 'ar' ? `تم تحديث حالة طلب التطوع إلى ${status}` : `Volunteer status updated to ${status}`, 'success');
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(currentLang === 'ar' ? `هل أنت متأكد من حذف طلب ${name}؟` : `Delete ${name}?`)) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!(await confirmDialog(currentLang === 'ar' ? `هل أنت متأكد من حذف طلب ${name}؟` : `Delete ${name}?`))) return;
     const updated = volunteers.filter(v => v.id !== id);
     db.saveVolunteers(updated);
     setVolunteers(updated);

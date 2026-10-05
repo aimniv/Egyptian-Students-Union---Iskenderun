@@ -3,6 +3,7 @@ import { LoginAttempt, ActivityLog, Language } from '../../types';
 import { db } from '../../data/mockDb';
 import { AdminAccounts } from './AdminAccounts';
 import { ShieldCheck, HardDrive, RefreshCw, FileDown, Upload, AlertOctagon, Lock } from 'lucide-react';
+import { confirmDialog, alertDialog } from '../../lib/dialog';
 
 interface Props {
   currentLang: Language;
@@ -42,12 +43,12 @@ export const SecurityTab: React.FC<Props> = ({ currentLang, addToast, addActivit
         window.location.reload();
       }, 1200);
     } else {
-      alert('Invalid JSON format or corrupted backup file');
+      alertDialog('Invalid JSON format or corrupted backup file');
     }
   };
 
-  const handleFactoryReset = () => {
-    if (confirm(currentLang === 'ar' ? 'تحذير: هل أنت متأكد من إعادة ضبط المنصة بالكامل إلى الإعدادات الأولية؟' : 'Warning: Reset entire system to initial seed data?')) {
+  const handleFactoryReset = async () => {
+    if (await confirmDialog(currentLang === 'ar' ? 'تحذير: هل أنت متأكد من إعادة ضبط المنصة بالكامل إلى الإعدادات الأولية؟' : 'Warning: Reset entire system to initial seed data?')) {
       db.resetToDefault();
       addToast('System reset to default state', 'info');
       setTimeout(() => {
