@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Language, WebsiteSettings } from './types';
-import { db } from './data/mockDb';
+import { db, SYNC_ERROR_EVENT } from './data/mockDb';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ClientPortal } from './components/ClientPortal';
@@ -48,11 +48,66 @@ export default function App() {
   // Toast notifications manager
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // Initialize and load database
-  useEffect(() => {
+  const bootedRef = useRef(false);
+  const langRef = useRef<Language>('ar');
+  langRef.current = currentLang;
+
+  const reloadFromDb = () => {
     setTranslations(db.getTranslations());
     setSettings(db.getSettings());
-    setCurrentLang('ar');
+  };
+
+  // Boot: if an admin session exists use it, then download the latest content from the server
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let session: AdminSession | null = null;
+      if (checkIsAdminPath()) {
+        try {
+          session = await adminApi.me();
+        } catch {
+          // not signed in
+        }
+      }
+      await db.hydrate(session !== null);
+      if (!alive) return;
+      if (session) setAdminSession(session);
+      reloadFromDb();
+      setCurrentLang('ar');
+      setIsCheckingSession(false);
+      bootedRef.current = true;
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Tell the administrator when an edit could not be saved on the server
+  useEffect(() => {
+    const onSyncError = (e: Event) => {
+      const code = (e as CustomEvent<{ code: string }>).detail?.code;
+      const lang = langRef.current;
+      const text: Record<string, Record<Language, string>> = {
+        too_large: {
+          ar: 'المحتوى كبير جداً ولم يُحفظ على الخادم (غالباً بسبب الصور). صغّر الصور ثم احفظ مجدداً.',
+          tr: 'İçerik çok büyük, sunucuya kaydedilemedi (genelde görseller). Görselleri küçültüp tekrar kaydedin.',
+          en: 'Content is too large and was not saved to the server (usually images). Use smaller images and save again.',
+        },
+        unauthenticated: {
+          ar: 'انتهت الجلسة. سجّل الدخول مجدداً ثم أعد الحفظ.',
+          tr: 'Oturum sona erdi. Tekrar giriş yapıp yeniden kaydedin.',
+          en: 'Session expired. Sign in again and save once more.',
+        },
+        default: {
+          ar: 'تعذر حفظ التعديل على الخادم. تحقق من الاتصال وأعد المحاولة.',
+          tr: 'Değişiklik sunucuya kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.',
+          en: 'The change could not be saved to the server. Check your connection and try again.',
+        },
+      };
+      addToast((text[code ?? ''] ?? text.default)[lang], 'warning');
+    };
+    window.addEventListener(SYNC_ERROR_EVENT, onSyncError);
+    return () => window.removeEventListener(SYNC_ERROR_EVENT, onSyncError);
   }, []);
 
   // Listen to popstate and hashchange events for deep linking (/admin and #/admin)
@@ -70,8 +125,9 @@ export default function App() {
     };
   }, []);
 
-  // Ask the server whether a valid admin session exists whenever /admin is opened
+  // Ask the server whether a valid admin session exists whenever /admin is opened later on
   useEffect(() => {
+    if (!bootedRef.current) return;
     if (!isAdminRoute || isAdminAuthenticated) {
       setIsCheckingSession(false);
       return;
@@ -80,7 +136,12 @@ export default function App() {
     setIsCheckingSession(true);
     adminApi
       .me()
-      .then((session) => !cancelled && setAdminSession(session))
+      .then(async (session) => {
+        await db.hydrate(true);
+        if (cancelled) return;
+        reloadFromDb();
+        setAdminSession(session);
+      })
       .catch(() => undefined)
       .finally(() => !cancelled && setIsCheckingSession(false));
     return () => {
@@ -143,8 +204,12 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAdminLoginSuccess = (session: AdminSession) => {
+  const handleAdminLoginSuccess = async (session: AdminSession) => {
+    setIsCheckingSession(true);
+    await db.hydrate(true);
+    reloadFromDb();
     setAdminSession(session);
+    setIsCheckingSession(false);
     addToast(
       currentLang === 'ar'
         ? 'تم تسجيل الدخول بنجاح! مرحباً بكم في لوحة التحكم الإدارية.'
@@ -157,6 +222,7 @@ export default function App() {
 
   const handleAdminLogout = () => {
     adminApi.logout().catch(() => undefined);
+    db.setAdmin(false);
     setAdminSession(null);
     addToast(
       currentLang === 'ar'
@@ -214,6 +280,7 @@ export default function App() {
             onNavigateToSite={() => navigateToSite('home')}
             onLogout={handleAdminLogout}
             adminEmail={adminSession?.email}
+            onDataRefreshed={reloadFromDb}
           />
         )
       ) : (

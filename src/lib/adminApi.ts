@@ -17,12 +17,13 @@ export interface AdminAccount {
   createdBy: string;
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+export async function request<T>(method: string, url: string, body?: unknown, timeoutMs = 15000): Promise<T> {
   let res: Response;
   try {
     res = await fetch(url, {
       method,
       credentials: 'same-origin',
+      signal: AbortSignal.timeout(timeoutMs),
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     });

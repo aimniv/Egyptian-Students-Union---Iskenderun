@@ -36,13 +36,38 @@ export const ImageUploadInput: React.FC<ImageUploadInputProps> = ({
       return;
     }
 
-    // Optional client-side resize or direct base64 reading
+    // Shrink before storing: images are saved inside the site content on the server, which has a size limit.
     const reader = new FileReader();
     reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        onChange(result);
+      const original = event.target?.result as string;
+      if (!original) return;
+      if (file.type === 'image/svg+xml' || file.type === 'image/gif') {
+        onChange(original);
+        return;
       }
+      const img = new Image();
+      img.onload = () => {
+        const keepAlpha = file.type === 'image/png' || file.type === 'image/webp';
+        const MAX = keepAlpha ? 800 : 1000;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          onChange(original);
+          return;
+        }
+        if (!keepAlpha) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = keepAlpha ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.8);
+        onChange(compressed.length < original.length ? compressed : original);
+      };
+      img.onerror = () => onChange(original);
+      img.src = original;
     };
     reader.readAsDataURL(file);
   };

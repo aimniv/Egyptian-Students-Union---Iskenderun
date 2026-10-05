@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Language, 
   WebsiteSettings,
@@ -39,6 +39,7 @@ interface AdminPanelProps {
   onNavigateToSite?: () => void;
   onLogout?: () => void;
   adminEmail?: string;
+  onDataRefreshed?: () => void;
 }
 
 type AdminTab = 
@@ -69,6 +70,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onNavigateToSite,
   onLogout,
   adminEmail,
+  onDataRefreshed,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   
@@ -85,8 +87,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setPendingVolunteers(db.getVolunteers().filter(v => v.status === 'pending').length);
   };
 
+  // Bumped when the server has newer data, so the open tab re-reads it
+  const [dataVersion, setDataVersion] = useState(0);
+  const firstTab = useRef(true);
+
   useEffect(() => {
     refreshBadges();
+    if (firstTab.current) {
+      firstTab.current = false;
+      return;
+    }
+    let alive = true;
+    db.refreshAdminData().then((changed) => {
+      if (!alive || !changed) return;
+      refreshBadges();
+      onDataRefreshed?.();
+      setDataVersion((v) => v + 1);
+    });
+    return () => {
+      alive = false;
+    };
   }, [activeTab]);
 
   const addActivityLog = (action: string, details: string) => {
@@ -240,7 +260,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
 
         {/* Right Content Area */}
-        <div className="col-span-1 lg:col-span-3">
+        <div className="col-span-1 lg:col-span-3" key={dataVersion}>
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
